@@ -1,75 +1,74 @@
-# client.py
 import socket
 import threading
-import tkinter as tk
-from tkinter import scrolledtext
+import random
 
-class ChatClient:
-    def __init__(self, host, port):
+class Client:
+    def __init__(self, host='127.0.0.1', port=9999):
         self.host = host
         self.port = port
-        self.nickname = ""
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-        self.window = tk.Tk()
-        self.window.title("Chat Client")
-
-        self.chat_area = scrolledtext.ScrolledText(self.window, width=50, height=20)
-        self.chat_area.pack(padx=10, pady=10)
-        self.chat_area.config(state=tk.DISABLED)
-
-        self.input_area = tk.Entry(self.window, width=50)
-        self.input_area.pack(padx=10, pady=5)
-        self.input_area.bind("<Return>", self.send_message)
-
-        self.send_button = tk.Button(self.window, text="Send", command=self.send_message)
-        self.send_button.pack(padx=10, pady=5)
-
-    def connect(self):
         self.client_socket.connect((self.host, self.port))
 
-        nickname_window = tk.Toplevel(self.window)
-        nickname_window.title("Enter Nickname")
+        self.nickname = input("Ingrese un nombre de usuario: ")
+        self.client_socket.send(self.nickname.encode('utf-8'))
 
-        nickname_label = tk.Label(nickname_window, text="Nickname:")
-        nickname_label.pack(padx=10, pady=5)
+        self.receive_thread = threading.Thread(target=self.receive)
+        self.receive_thread.start()
 
-        nickname_entry = tk.Entry(nickname_window, width=20)
-        nickname_entry.pack(padx=10, pady=5)
+        self.chat_window = self.create_chat_window()
 
-        def set_nickname():
-            self.nickname = nickname_entry.get()
-            nickname_window.destroy()
-            self.client_socket.send(f"NICK {self.nickname}".encode('utf-8'))
-            receive_thread = threading.Thread(target=self.receive_messages)
-            receive_thread.start()
-
-        nickname_button = tk.Button(nickname_window, text="Set Nickname", command=set_nickname)
-        nickname_button.pack(padx=10, pady=5)
-
-        self.window.mainloop()
-
-    def receive_messages(self):
+    def receive(self):
         while True:
             try:
                 message = self.client_socket.recv(1024).decode('utf-8')
-                self.chat_area.config(state=tk.NORMAL)
-                self.chat_area.insert(tk.END, message + "\n")
-                self.chat_area.config(state=tk.DISABLED)
-                self.chat_area.see(tk.END)
-            except ConnectionAbortedError:
+                if message.startswith("NICKNAME_CONFIRMED"):
+                    print("Tu nombre ha sido confirmado.")
+                elif message.startswith("GAME_CREATED"):
+                    self.create_tictactoe_game()
+                else:
+                    print(message)
+            except:
+                print("Error al recibir datos del servidor.")
+                self.client_socket.close()
                 break
 
-    def send_message(self, event=None):
-        message = self.input_area.get()
-        self.input_area.delete(0, tk.END)
-        self.client_socket.send(f"MSG {message}".encode('utf-8'))
+    def send_message(self, message):
+        self.client_socket.send(message.encode('utf-8'))
 
-    def disconnect(self):
-        self.client_socket.send("QUIT".encode('utf-8'))
-        self.client_socket.close()
-        self.window.quit()
+    def create_tictactoe_game(self):
+        self.tictactoe_window = self.create_tictactoe_window()
 
-if __name__ == '__main__':
-    client = ChatClient('localhost', 12345)
-    client.connect()
+    def create_chat_window(self):
+        chat_window = ""
+        chat_window += "Conectado al servidor.\n\n"
+        chat_window += "Para iniciar un juego de Tictactoe, escriba:\n"
+        chat_window += "/tictactoe <nombre_del_oponente>\n\n"
+        chat_window += "Chat:"
+        return chat_window
+
+    def create_tictactoe_window(self):
+        tictactoe_window = ""
+        tictactoe_window += "Juego de Tictactoe contra " + self.nickname + "\n\n"
+        tictactoe_window += "Turno de X\n\n"
+        tictactoe_window += "Disponibles: "
+        for i in range(9):
+            if self.board[i] == ' ':
+                tictactoe_window += str(i) + " "
+        tictactoe_window += "\n\n"
+        tictactoe_window += "Ingrese su movimiento (0-8): "
+        return tictactoe_window
+
+    def run(self):
+        while True:
+            command = input("\nCliente> ").strip()
+            if command.lower() == 'quit':
+                self.client_socket.close()
+                break
+            elif command.startswith('/tictactoe'):
+                self.send_message(command)
+            else:
+                self.send_message(command)
+
+if __name__ == "__main__":
+    client = Client()
+    client.run()

@@ -1,0 +1,1 @@
+pyinstaller --onefile --name cliente.exe --icon="C:\\Users\\francisco.javier.mil\\Music\\server\\V_conActu\\icons8.ico" cliente.py --hidden-import plyer.platforms.win.notification 

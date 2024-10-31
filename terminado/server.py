@@ -21,17 +21,29 @@ def encontrar_links(texto):
         return links[0]
 
 def image_to_ascii(image_url, width=100):
-    response = requests.get(image_url)
-    img = Image.open(BytesIO(response.content))
-    img = img.convert('L')
-    aspect_ratio = img.height / img.width
-    new_height = int(aspect_ratio * width * 0.55)
-    img = img.resize((width, new_height))
-    pixels = np.array(img)
-    chars = np.array([' ', '.', ':', '-', '=', '+', '*', '#', '%', '@'])
-    normalized_pixels = (pixels - pixels.min()) / (pixels.max() - pixels.min()) * (chars.size - 1)
-    ascii_art = "\n".join("".join(chars[pixel] for pixel in row) for row in normalized_pixels.astype(int))
-    return ascii_art
+    # Verificar si el comando está incompleto
+    if not image_url:
+        return "Uso: /img <url>"
+
+    # Verificar si la URL es válida
+    if not re.match(r'^https?://', image_url):
+        return "URL no válida"
+
+    try:
+        response = requests.get(image_url)
+        img = Image.open(BytesIO(response.content))
+        img = img.convert('L')
+        aspect_ratio = img.height / img.width
+        new_height = int(aspect_ratio * width * 0.55)
+        img = img.resize((width, new_height))
+        pixels = np.array(img)
+        chars = np.array([' ', '.', ':', '-', '=', '+', '*', '#', '%', '@'])
+        normalized_pixels = (pixels - pixels.min()) / (pixels.max() - pixels.min()) * (chars.size - 1)
+        ascii_art = "\n".join("".join(chars[pixel] for pixel in row) for row in normalized_pixels.astype(int))
+        return ascii_art
+    except Exception as e:
+        return f"Error al procesar la imagen"
+
 
 def send_update(client_socket):
     try:
@@ -48,53 +60,6 @@ def send_update(client_socket):
         client_socket.send(b"END_OF_UPDATE")
     except Exception as e:
         print(f"Error al enviar la actualización: {e}")
-
-def start_tictactoe(player1_socket, player2_socket, player1_nick, player2_nick):
-    # Crear una nueva partida y enviarla a los jugadores
-    game_key = (min(player1_nick, player2_nick), max(player1_nick, player2_nick))
-    games[game_key] = [["" for _ in range(3)] for _ in range(3)]
-    player1_socket.send(f"/tictactoe {player2_nick}".encode('utf-8'))
-    player2_socket.send(f"/tictactoe {player1_nick}".encode('utf-8'))
-    print(f"Juego iniciado entre {player1_nick} y {player2_nick}")
-
-
-def update_tictactoe(game_key, row, col, player, socket):
-    # Ajustar la clave del juego con el mismo orden en el diccionario `games`
-    game_key = (min(game_key[0], game_key[1]), max(game_key[0], game_key[1]))
-    if game_key in games:
-        board = games[game_key]
-        board[row][col] = player
-        player1, player2 = game_key
-        # Enviar la jugada a ambos jugadores
-        for sock in [clients[nicknames.index(player1)], clients[nicknames.index(player2)]]:
-            sock.send(f"/move {row} {col} {player}".encode('utf-8'))
-
-        # Chequear ganador o empate después del movimiento
-        if check_winner(board, player):
-            for sock in [clients[nicknames.index(player1)], clients[nicknames.index(player2)]]:
-                sock.send(f"/win {player}".encode('utf-8'))
-            del games[game_key]
-        elif is_board_full(board):
-            for sock in [clients[nicknames.index(player1)], clients[nicknames.index(player2)]]:
-                sock.send("/draw".encode('utf-8'))
-            del games[game_key]
-    else:
-        socket.send("Error: no se encontró la partida.\n".encode('utf-8'))
-
-
-def check_winner(board, player):
-    for row in board:
-        if all([cell == player for cell in row]):
-            return True
-    for col in range(3):
-        if all([board[row][col] == player for row in range(3)]):
-            return True
-    if all([board[i][i] == player for i in range(3)]) or all([board[i][2 - i] == player for i in range(3)]):
-        return True
-    return False
-
-def is_board_full(board):
-    return all([cell != "" for row in board for cell in row])
 
 def handle_client(client_socket):
     try:
@@ -152,18 +117,6 @@ def chat_handler(client_socket):
                 image_url = encontrar_links(message)
                 img = image_to_ascii(image_url)
                 broadcast("\n".join(img.splitlines()).encode('utf-8'))
-            elif message.upper().startswith("/TICTACTOE "):
-                target_nick = message.split(" ")[1]
-                if target_nick in nicknames:
-                    start_tictactoe(client_socket, clients[nicknames.index(target_nick)], nickname, target_nick)
-                    print(games)
-                else:
-                    client_socket.send(f"Usuario '{target_nick}' no encontrado.\n".encode('utf-8'))
-            elif message.upper().startswith("/MOVE "):
-                _, row, col, player = message.split(" ")
-                row, col = int(row), int(col)
-                game_key = (nickname, nicknames[clients.index(client_socket)]) if (nickname, nicknames[clients.index(client_socket)]) in games else (nicknames[clients.index(client_socket)], nickname)
-                update_tictactoe(game_key, row, col, player, client_socket)
             else:
                 broadcast(f"{nickname} {message}".encode('utf-8'))
     except Exception as e:
