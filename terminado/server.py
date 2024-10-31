@@ -6,11 +6,12 @@ from PIL import Image
 import requests
 from io import BytesIO
 import re
+import random
 
 server_version = "0.3"
 clients = []
 nicknames = []
-games = {}  # Diccionario para almacenar juegos en curso
+games = []  # Diccionario para almacenar juegos en curso
 
 def encontrar_links(texto):
     patron = r'(https?://[^\s]+)'
@@ -93,6 +94,40 @@ def chat_handler(client_socket):
             if message.upper() == "/USERS":
                 user_list = "Usuarios conectados:\n" + "\n".join(nicknames)
                 client_socket.send(user_list.encode('utf-8'))
+            
+            # piedra papel tijera
+            elif "/MANOS" in message.upper():
+
+                parts = message.split(" ", 2)
+                if len(parts) < 2:
+                    client_socket.send("Uso: /manos <jugador>\n".encode('utf-8'))
+                    continue
+                target_nickname = parts[1]
+                print("target_nickname: " + target_nickname)
+                
+                if target_nickname in nicknames:
+                    target_index = nicknames.index(target_nickname)
+                    target_client = clients[target_index]
+
+                    games.append({"id":len(games), "jugador1": nickname, "jugador2": target_nickname})
+
+                    turno_retador = random.randint(0, 1)
+
+                    if turno_retador == 0:
+                        turno_rival = 1
+                    elif turno_retador == 1:
+                        turno_rival = 0
+                    
+                    print(games)
+
+                    broadcast(f"{nickname} vs {target_nickname}".encode('utf-8'))
+
+                    target_client.send(f"/[game] {len(games)-1} {nickname} {turno_retador}".encode('utf-8'))
+                    client_socket.send(f"/[game] {len(games)-1} {target_nickname} {turno_rival}".encode('utf-8'))
+                else:
+                    client_socket.send(f"Usuario '{target_nickname}' no encontrado.\n".encode('utf-8'))
+
+            # message privado
             elif "/MSG" in message.upper():
                 parts = message.split(" ", 3)
                 if len(parts) < 3:
