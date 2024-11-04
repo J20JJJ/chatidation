@@ -1,104 +1,67 @@
+# server.py
 import socket
 import threading
-import random
 
-class TicTacToeGame:
-    def __init__(self):
-        self.board = [' ' for _ in range(9)]
-        self.current_player = 'X'
+# Configuración del servidor
+HOST = '172.16.53.3'
+PORT = 65432
 
-    def check_win(self):
-        win_conditions = [(0, 1, 2), (3, 4, 5), (6, 7, 8), (0, 3, 6), (1, 4, 7), (2, 5, 8), (0, 4, 8), (2, 4, 6)]
-        for condition in win_conditions:
-            if self.board[condition[0]] == self.board[condition[1]] == self.board[condition[2]] != ' ':
-                return True
-        return False
+# Almacenar conexiones y elecciones de jugadores
+connections = []
+choices = {}
 
-    def reset_game(self):
-        self.board = [' ' for _ in range(9)]
-        self.current_player = 'X'
+# Función para manejar la conexión con cada cliente
+def handle_client(conn, addr):
+    print(f"[NUEVA CONEXIÓN] {addr} conectado.")
+    conn.send("Bienvenido al juego de Piedra, Papel o Tijera. Haz tu elección (piedra, papel, tijera):".encode('utf-8'))
+    
+    try:
+        # Recibir elección del jugador
+        choice = conn.recv(1024).decode('utf-8').lower()
+        choices[addr] = choice
+        print(f"[ELECCIÓN] {addr} eligió {choice}")
 
-    def update_board(self, move):
-        self.board[move] = self.current_player
-        self.current_player = 'O' if self.current_player == 'X' else 'X'
-        return self.check_win()
+        # Esperar hasta que todos los jugadores hayan elegido
+        if len(choices) == len(connections):
+            results = evaluate_winner()
+            for c in connections:
+                c.send(results.encode('utf-8'))
+            reset_game()
+    except:
+        print(f"[ERROR] Error con la conexión {addr}")
+    finally:
+        conn.close()
 
-    def get_board_state(self):
-        return ' '.join(self.board)
+# Función para evaluar el ganador
+def evaluate_winner():
+    if len(set(choices.values())) == 1:
+        return "¡Empate! Todos eligieron lo mismo."
+    elif ("piedra" in choices.values() and "tijera" in choices.values() and "papel" in choices.values()):
+        return "¡Empate! Se eligieron todas las opciones."
+    else:
+        # Lógica de comparación entre jugadores
+        winners = []
+        for addr, choice in choices.items():
+            if (choice == "piedra" and "tijera" in choices.values()) or \
+               (choice == "tijera" and "papel" in choices.values()) or \
+               (choice == "papel" and "piedra" in choices.values()):
+                winners.append(f"Jugador {addr} con {choice}")
+        return f"Ganador(es): {', '.join(winners)}"
 
-class ChatServer:
-    def __init__(self, host='127.0.0.1', port=9999):
-        self.host = host
-        self.port = port
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.bind((self.host, self.port))
-        self.server_socket.listen(5)
-        print(f"Servidor iniciado en {host}:{port}")
+# Función para reiniciar el juego
+def reset_game():
+    global choices
+    choices = {}
 
-        self.clients = []
-        self.nicknames = []
+# Iniciar el servidor
+server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server.bind((HOST, PORT))
+server.listen()
 
-        self.tictactoe_games = {}
-
-        self.handle_clients()
-
-    def handle_clients(self):
-        while True:
-            client, addr = self.server_socket.accept()
-            print(f"Nuevo cliente conectado: {addr}")
-
-            client_handler = threading.Thread(target=self.handle_client, args=(client,))
-            client_handler.start()
-
-    def handle_client(self, client):
-        nickname = client.recv(1024).decode('utf-8')
-        self.nicknames.append(nickname)
-        self.clients.append(client)
-
-        print(f"Cliente {nickname} se ha conectado.")
-
-        client.send("NICKNAME_CONFIRMED".encode('utf-8'))
-
-        while True:
-            try:
-                message = client.recv(1024).decode('utf-8')
-                if message.startswith("/tictactoe"):
-                    game_request = message.split()[1:]
-                    if len(game_request) != 2:
-                        client.send("INVALID_GAME_REQUEST".encode('utf-8'))
-                        continue
-                    
-                    opponent_nickname = game_request[1]
-                    if opponent_nickname not in self.nicknames:
-                        client.send("OPPONENT_NOT_FOUND".encode('utf-8'))
-                        continue
-                    
-                    if nickname in self.tictactoe_games:
-                        client.send("ALREADY_IN_GAME".encode('utf-8'))
-                        continue
-                    
-                    game = TicTacToeGame()
-                    
-                    self.tictactoe_games[nickname] = {"game": game, "opponent": opponent_nickname}
-                    self.tictactoe_games[opponent_nickname] = {"game": game, "opponent": nickname}
-
-                    client.send("GAME_CREATED".encode('utf-8'))
-                else:
-                    broadcast(message, nickname)
-            except:
-                index = self.clients.index(client)
-                self.clients.remove(client)
-                self.nicknames.remove(nickname)
-                self.tictactoe_games.pop(nickname, None)
-                self.tictactoe_games.pop(opponent, None)
-                client.close()
-                print(f"Cliente {nickname} desconectado.")
-                break
-
-def broadcast(message, sender):
-    for client in clients:
-        if client != sender:
-            client.send(message.encode('utf-8'))
-
-if __name__ == "__main__":
-    chat_server = ChatServer()
+print("[INICIANDO] El servidor está escuchando...")
+while True:
+    conn, addr = server.accept()
+    connections.append(conn)
+    thread = threading.Thread(target=handle_client, args=(conn, addr))
+    thread.start()
+    print(f"[CONEXIONES ACTIVAS] {threading.activeCount() - 1}")

@@ -10,6 +10,7 @@ import tkinter as tk
 version = "0.3"
 contador_msg = 0  
 chat_visible = -1  
+ventana_juego = None
 
 def borra_backup():
     backup_path = "cliente_backup.exe"
@@ -21,50 +22,8 @@ def borra_backup():
         except Exception as e:
             print(f"Error al eliminar '{backup_path}': {e}")
 
-def start_game(idGame, jugador):
-
-    def on_button_click(button_name):
-        # Imprimir el botón presionado en la consola
-        print(f'Botón presionado: {button_name}')
-        
-        # Actualizar el label con la elección del oponente
-        opponent_label.config(text=f"Oponente eligió: Papel")  # Oponente fijo elige "Papel"
-        
-        # Determinar el resultado
-        if button_name == "Piedra":
-            result_label.config(text="¡Pierdes!", fg="red")
-        elif button_name == "Papel":
-            result_label.config(text="Empate", fg="orange")
-        elif button_name == "Tijeras":
-            result_label.config(text="¡Ganas!", fg="green")
-
-    # Crear la ventana principal
-    root = tk.Tk()
-    root.title("Juego de Piedra, Papel o Tijeras")
-
-    # Crear botones grandes
-    button1 = tk.Button(root, text="Piedra", width=10, height=5, command=lambda: on_button_click("Piedra"))
-    button2 = tk.Button(root, text="Papel", width=10, height=5, command=lambda: on_button_click("Papel"))
-    button3 = tk.Button(root, text="Tijeras", width=10, height=5, command=lambda: on_button_click("Tijeras"))
-
-    # Crear labels para mostrar la elección del oponente y el resultado
-    opponent_label = tk.Label(root, text="")
-    result_label = tk.Label(root, text="", font=("Arial", 16))
-
-    # Colocar los botones en la ventana
-    button1.pack(side=tk.LEFT, padx=10, pady=10)
-    button2.pack(side=tk.LEFT, padx=10, pady=10)
-    button3.pack(side=tk.LEFT, padx=10, pady=10)
-
-    # Colocar los labels en la ventana
-    opponent_label.pack(pady=10)
-    result_label.pack(pady=10)
-
-    # Iniciar el bucle principal
-    root.mainloop()
-
-
-def sensor_comandos(message):
+def sensor_comandos(message, client_socket):
+    global ventana_juego  # Asegúrate de que ventana_juego sea global para poder cerrarla desde cualquier parte
     if "/[game]" in message:
         parts = message.split(" ", 3)
         if len(parts) < 4:
@@ -76,7 +35,68 @@ def sensor_comandos(message):
             print("idGame: " + idGame)
             print("jugador: " + jugador)
             print("Tu turno es: " + turno)
-            start_game(idGame, jugador)
+
+            # Crear la ventana de Tkinter en un hilo separado
+            def iniciar_juego():
+                global ventana_juego
+
+                if ventana_juego is not None:
+                    ventana_juego.after(0, ventana_juego.destroy)
+
+                # Función para enviar la jugada
+                def enviar_jugada(jugada):
+                    client_socket.send(f"/juego ppt {jugada}".encode('utf-8'))
+                    # Bloquear los botones después de seleccionar
+                    btn_piedra.config(state="disabled")
+                    btn_papel.config(state="disabled")
+                    btn_tijeras.config(state="disabled")
+
+                # Crear ventana de Tkinter
+                ventana_juego = tk.Tk()
+                ventana_juego.title("Piedra, Papel o Tijeras")
+
+                # Crear botones de juego
+                btn_piedra = tk.Button(ventana_juego, text="Piedra", command=lambda: enviar_jugada("piedra"))
+                btn_papel = tk.Button(ventana_juego, text="Papel", command=lambda: enviar_jugada("papel"))
+                btn_tijeras = tk.Button(ventana_juego, text="Tijeras", command=lambda: enviar_jugada("tijeras"))
+
+                # Posicionar botones
+                btn_piedra.pack(padx=10, pady=5)
+                btn_papel.pack(padx=10, pady=5)
+                btn_tijeras.pack(padx=10, pady=5)
+
+                # Mostrar ventana
+                ventana_juego.mainloop()
+
+            # Iniciar el juego en un hilo
+            threading.Thread(target=iniciar_juego).start()
+
+    # Mostrar resultado del juego si el mensaje contiene "/juego win", "/juego lose", o "/juego empate"
+    elif message == "/juego win":
+        mostrar_resultado("¡Has ganado!", "green")
+
+    elif message == "/juego lose":
+        mostrar_resultado("¡Has perdido!", "red")
+
+    elif message == "/juego empate":
+        mostrar_resultado("¡Empate!", "orange")
+
+def mostrar_resultado(mensaje, color):
+    # Limpiar la ventana anterior
+    for widget in ventana_juego.winfo_children():
+        widget.destroy()
+
+    # Crear un nuevo label para mostrar el resultado
+    resultado_label = tk.Label(ventana_juego, text=mensaje, fg=color, font=("Helvetica", 24))
+    resultado_label.pack(padx=20, pady=20)
+
+    # Opción para cerrar el juego o reiniciar (puedes ajustar esto según tus necesidades)
+    btn_cerrar = tk.Button(ventana_juego, text="Cerrar", command=ventana_juego.destroy)
+    btn_cerrar.pack(pady=10)
+
+    # Actualizar la ventana
+    ventana_juego.update()
+        
 
 def chat(client_socket):
     global chat_visible
@@ -92,7 +112,7 @@ def chat(client_socket):
                     break
                 print(message)
 
-                sensor_comandos(message)
+                sensor_comandos(message, client_socket)
 
                 contador_msg += 1
             except:

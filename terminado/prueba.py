@@ -1,41 +1,35 @@
 import tkinter as tk
+import threading
 
-def on_button_click(button_name):
-    # Imprimir el botón presionado en la consola
-    print(f'Botón presionado: {button_name}')
+# Variable para guardar la instancia de la ventana
+ventana = None
+
+def crear_ventana():
+    global ventana
     
-    # Actualizar el label con la elección del oponente
-    opponent_label.config(text=f"Oponente eligió: Papel")  # Oponente fijo elige "Papel"
+    # Si ya existe una ventana, la destruye desde el hilo principal usando after()
+    if ventana is not None:
+        ventana.after(0, ventana.destroy)
     
-    # Determinar el resultado
-    if button_name == "Piedra":
-        result_label.config(text="¡Pierdes!", fg="red")
-    elif button_name == "Papel":
-        result_label.config(text="Empate", fg="orange")
-    elif button_name == "Tijeras":
-        result_label.config(text="¡Ganas!", fg="green")
+    # Crea una nueva instancia de Tk y guarda la referencia
+    ventana = tk.Tk()
+    ventana.title("Ventana en Segundo Hilo")
+    ventana.geometry("300x200")
+    
+    # Contenido de la ventana
+    label = tk.Label(ventana, text="¡Hola desde la ventana en segundo hilo!")
+    label.pack(pady=20)
+    
+    # Inicia el bucle principal de tkinter
+    ventana.mainloop()
 
-# Crear la ventana principal
-root = tk.Tk()
-root.title("Juego de Piedra, Papel o Tijeras")
+def abrir_ventana_en_hilo():
+    hilo = threading.Thread(target=crear_ventana)
+    hilo.start()
 
-# Crear botones grandes
-button1 = tk.Button(root, text="Piedra", width=10, height=5, command=lambda: on_button_click("Piedra"))
-button2 = tk.Button(root, text="Papel", width=10, height=5, command=lambda: on_button_click("Papel"))
-button3 = tk.Button(root, text="Tijeras", width=10, height=5, command=lambda: on_button_click("Tijeras"))
+# Ejemplo de cómo llamar a la función
+while True:
+    input()
+    abrir_ventana_en_hilo()  # Abre la primera ventana
 
-# Crear labels para mostrar la elección del oponente y el resultado
-opponent_label = tk.Label(root, text="")
-result_label = tk.Label(root, text="", font=("Arial", 16))
-
-# Colocar los botones en la ventana
-button1.pack(side=tk.LEFT, padx=10, pady=10)
-button2.pack(side=tk.LEFT, padx=10, pady=10)
-button3.pack(side=tk.LEFT, padx=10, pady=10)
-
-# Colocar los labels en la ventana
-opponent_label.pack(pady=10)
-result_label.pack(pady=10)
-
-# Iniciar el bucle principal
-root.mainloop()
+# Llama a esta función otra vez cuando quieras abrir una nueva ventana

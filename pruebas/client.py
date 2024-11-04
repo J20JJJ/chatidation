@@ -1,74 +1,51 @@
+# client_gui.py
 import socket
-import threading
-import random
+import tkinter as tk
+from tkinter import messagebox
 
-class Client:
-    def __init__(self, host='127.0.0.1', port=9999):
-        self.host = host
-        self.port = port
-        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.client_socket.connect((self.host, self.port))
+# Configuración del cliente
+HOST = '172.16.53.3'
+PORT = 65432
 
-        self.nickname = input("Ingrese un nombre de usuario: ")
-        self.client_socket.send(self.nickname.encode('utf-8'))
+# Conectar con el servidor
+client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+client.connect((HOST, PORT))
 
-        self.receive_thread = threading.Thread(target=self.receive)
-        self.receive_thread.start()
+# Función para enviar elección al servidor
+def send_choice(choice):
+    try:
+        client.send(choice.encode('utf-8'))
+        result = client.recv(1024).decode('utf-8')
+        result_label.config(text=f"Resultado: {result}")
+    except:
+        messagebox.showerror("Error", "Error de conexión con el servidor.")
+    finally:
+        client.close()
 
-        self.chat_window = self.create_chat_window()
+# Configuración de la ventana con tkinter
+root = tk.Tk()
+root.title("Juego Piedra, Papel o Tijera")
 
-    def receive(self):
-        while True:
-            try:
-                message = self.client_socket.recv(1024).decode('utf-8')
-                if message.startswith("NICKNAME_CONFIRMED"):
-                    print("Tu nombre ha sido confirmado.")
-                elif message.startswith("GAME_CREATED"):
-                    self.create_tictactoe_game()
-                else:
-                    print(message)
-            except:
-                print("Error al recibir datos del servidor.")
-                self.client_socket.close()
-                break
+# Etiqueta de bienvenida
+welcome_label = tk.Label(root, text="Elige tu opción:", font=("Arial", 14))
+welcome_label.pack(pady=10)
 
-    def send_message(self, message):
-        self.client_socket.send(message.encode('utf-8'))
+# Botones de elección
+button_frame = tk.Frame(root)
+button_frame.pack(pady=10)
 
-    def create_tictactoe_game(self):
-        self.tictactoe_window = self.create_tictactoe_window()
+btn_piedra = tk.Button(button_frame, text="Piedra", font=("Arial", 12), width=10, command=lambda: send_choice("piedra"))
+btn_piedra.grid(row=0, column=0, padx=5)
 
-    def create_chat_window(self):
-        chat_window = ""
-        chat_window += "Conectado al servidor.\n\n"
-        chat_window += "Para iniciar un juego de Tictactoe, escriba:\n"
-        chat_window += "/tictactoe <nombre_del_oponente>\n\n"
-        chat_window += "Chat:"
-        return chat_window
+btn_papel = tk.Button(button_frame, text="Papel", font=("Arial", 12), width=10, command=lambda: send_choice("papel"))
+btn_papel.grid(row=0, column=1, padx=5)
 
-    def create_tictactoe_window(self):
-        tictactoe_window = ""
-        tictactoe_window += "Juego de Tictactoe contra " + self.nickname + "\n\n"
-        tictactoe_window += "Turno de X\n\n"
-        tictactoe_window += "Disponibles: "
-        for i in range(9):
-            if self.board[i] == ' ':
-                tictactoe_window += str(i) + " "
-        tictactoe_window += "\n\n"
-        tictactoe_window += "Ingrese su movimiento (0-8): "
-        return tictactoe_window
+btn_tijera = tk.Button(button_frame, text="Tijera", font=("Arial", 12), width=10, command=lambda: send_choice("tijera"))
+btn_tijera.grid(row=0, column=2, padx=5)
 
-    def run(self):
-        while True:
-            command = input("\nCliente> ").strip()
-            if command.lower() == 'quit':
-                self.client_socket.close()
-                break
-            elif command.startswith('/tictactoe'):
-                self.send_message(command)
-            else:
-                self.send_message(command)
+# Etiqueta para mostrar el resultado
+result_label = tk.Label(root, text="Esperando resultado...", font=("Arial", 14))
+result_label.pack(pady=20)
 
-if __name__ == "__main__":
-    client = Client()
-    client.run()
+# Iniciar la ventana
+root.mainloop()

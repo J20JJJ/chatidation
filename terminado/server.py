@@ -46,6 +46,67 @@ def image_to_ascii(image_url, width=100):
         return f"Error al procesar la imagen"
 
 
+def comprovar_ppt(game, ipJugador, jugador):
+
+
+    def sacar_ip_del_otroJugador():
+        if jugador == "1":
+            target_nickname = game["jugador2"]
+            if target_nickname in nicknames:
+                target_index = nicknames.index(target_nickname)
+                ip_del_otroJugador = clients[target_index]
+        if jugador == "2":
+            target_nickname = game["jugador1"]
+            if target_nickname in nicknames:
+                target_index = nicknames.index(target_nickname)
+                ip_del_otroJugador = clients[target_index]
+
+        return ip_del_otroJugador
+
+
+
+    def gana_J1():
+        sacar_ip_del_otroJugador().send(f"/juego lose".encode('utf-8'))
+        ipJugador.send(f"/juego win".encode('utf-8'))
+        print("Jugador 1 gana")
+        
+    def gana_J2():
+        sacar_ip_del_otroJugador().send(f"/juego win".encode('utf-8'))
+        ipJugador.send(f"/juego lose".encode('utf-8'))
+        print("Jugador 2 gana")
+
+    def empate():
+        sacar_ip_del_otroJugador().send(f"/juego empate".encode('utf-8'))
+        ipJugador.send(f"/juego empate".encode('utf-8'))
+        print("EMPATE")
+    
+
+
+    if game["mano_j1"] == game["mano_j2"]:
+        empate()
+        # print("EMPATE")
+    elif game["mano_j1"] == "papel" and game["mano_j2"] == "piedra":
+        gana_J1()
+        # print("Jugador 1 gana")
+    elif game["mano_j1"] == "piedra" and game["mano_j2"] == "papel":
+        gana_J2()
+        # print("Jugador 2 gana")
+    elif game["mano_j1"] == "tijeras" and game["mano_j2"] == "papel":
+        gana_J1()
+        # print("Jugador 1 gana")
+    elif game["mano_j1"] == "papel" and game["mano_j2"] == "tijeras":
+        gana_J2()
+        # print("Jugador 2 gana")
+    elif game["mano_j1"] == "piedra" and game["mano_j2"] == "tijeras":
+        gana_J1()
+        # print("Jugador 1 gana")
+    elif game["mano_j1"] == "tijeras" and game["mano_j2"] == "piedra":
+        gana_J2()
+        # print("Jugador 2 gana")
+    
+
+        
+
 def send_update(client_socket):
     try:
         file_path = "terminado/cliente.exe"
@@ -109,7 +170,7 @@ def chat_handler(client_socket):
                     target_index = nicknames.index(target_nickname)
                     target_client = clients[target_index]
 
-                    games.append({"id":len(games), "jugador1": nickname, "jugador2": target_nickname})
+                    games.append({"id":len(games), "jugador1": nickname, "jugador2": target_nickname, "mano_j1":"", "mano_j2":""})
 
                     turno_retador = random.randint(0, 1)
 
@@ -126,6 +187,55 @@ def chat_handler(client_socket):
                     client_socket.send(f"/[game] {len(games)-1} {target_nickname} {turno_rival}".encode('utf-8'))
                 else:
                     client_socket.send(f"Usuario '{target_nickname}' no encontrado.\n".encode('utf-8'))
+
+            elif "/JUEGO" in message.upper():         
+                parts = message.split(" ", 2)
+                
+                # Encontrar el índice y el nombre del usuario que envió el comando
+                index = clients.index(client_socket)
+                nickname = nicknames[index]
+                
+                # Verificar si el mensaje tiene el formato esperado
+                if len(parts) > 1:
+                    comando = parts[1]  # El comando que el usuario quiere ejecutar
+
+                    # Verificar si se ha especificado un movimiento en el mensaje
+                    if len(parts) > 2:
+                        movimiento = parts[2]  # Movimiento opcional del jugador
+                    else:
+                        movimiento = "Movimiento no especificado"
+
+                    print(f"Comando: {comando}, Usuario: {nickname}, Movimiento: {movimiento}")
+                    
+                    if comando == "ppt":
+                        for game in games:
+
+                            if nickname == game["jugador1"]:
+                                game["mano_j1"] = movimiento
+                                print("el jugador1 es: " + nickname)
+                                comprovar_ppt(game, client_socket, "1")
+                                break  
+                                
+                            elif nickname == game["jugador2"]:
+                                game["mano_j2"] = movimiento
+                                print("el jugador2 es: " + nickname)
+                                comprovar_ppt(game, client_socket, "2")
+                                break  
+                        
+                            
+                        else: 
+                            print("No se ha econtrado al jugador " + nickname)
+                    
+                    print(games)
+
+                else:
+                    comando = "Comando no especificado"
+                
+                # Imprimir el comando junto con el nombre del usuario
+                # print(f"Comando: {comando}, Usuario: {nickname}")
+                
+                
+
 
             # message privado
             elif "/MSG" in message.upper():
