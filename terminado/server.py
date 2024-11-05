@@ -49,6 +49,10 @@ def image_to_ascii(image_url, width=100):
 def comprovar_ppt(game, ipJugador, jugador):
 
 
+    def borrar_partida():
+        games.remove(game)
+        print(games)
+
     def sacar_ip_del_otroJugador():
         if jugador == "1":
             target_nickname = game["jugador2"]
@@ -66,16 +70,19 @@ def comprovar_ppt(game, ipJugador, jugador):
 
 
     def gana_J1():
+        borrar_partida()
         sacar_ip_del_otroJugador().send(f"/juego lose".encode('utf-8'))
         ipJugador.send(f"/juego win".encode('utf-8'))
         print("Jugador 1 gana")
         
     def gana_J2():
+        borrar_partida()
         sacar_ip_del_otroJugador().send(f"/juego win".encode('utf-8'))
         ipJugador.send(f"/juego lose".encode('utf-8'))
         print("Jugador 2 gana")
 
     def empate():
+        borrar_partida()
         sacar_ip_del_otroJugador().send(f"/juego empate".encode('utf-8'))
         ipJugador.send(f"/juego empate".encode('utf-8'))
         print("EMPATE")
@@ -170,7 +177,7 @@ def chat_handler(client_socket):
                     target_index = nicknames.index(target_nickname)
                     target_client = clients[target_index]
 
-                    games.append({"id":len(games), "jugador1": nickname, "jugador2": target_nickname, "mano_j1":"", "mano_j2":""})
+                    games.append({"jugador1": nickname, "jugador2": target_nickname, "mano_j1":"", "mano_j2":""})
 
                     turno_retador = random.randint(0, 1)
 
@@ -183,8 +190,8 @@ def chat_handler(client_socket):
 
                     broadcast(f"{nickname} vs {target_nickname}".encode('utf-8'))
 
-                    target_client.send(f"/[game] {len(games)-1} {nickname} {turno_retador}".encode('utf-8'))
-                    client_socket.send(f"/[game] {len(games)-1} {target_nickname} {turno_rival}".encode('utf-8'))
+                    target_client.send(f"/[game] {nickname} {turno_retador}".encode('utf-8'))
+                    client_socket.send(f"/[game] {target_nickname} {turno_rival}".encode('utf-8'))
                 else:
                     client_socket.send(f"Usuario '{target_nickname}' no encontrado.\n".encode('utf-8'))
 
