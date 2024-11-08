@@ -7,7 +7,7 @@ import keyboard  # Para detectar la pulsación de teclas
 from plyer import notification
 import tkinter as tk
 
-version = "0.3"
+version = "0.5"
 contador_msg = 0  
 chat_visible = -1  
 
@@ -21,16 +21,34 @@ def borra_backup():
         try:
             os.remove(backup_path)
             print(f"'{backup_path}' eliminado.")
+            os.system("clear")
         except Exception as e:
             print(f"Error al eliminar '{backup_path}': {e}")
+            os.system("clear")
 
 
-def crear_ventana(client_socket):
+def limpiar_consola():
+    if os.name == "nt":  # Para Windows
+        os.system("cls")
+    else:  # Para sistemas Unix (Linux, macOS)
+        os.system("clear")
+
+# Función que crea la ventana inicial y se mantiene abierta
+def crear_ventana_inicial():
     global ventana_juego
-    
-
     ventana_juego = tk.Tk()
-    ventana_juego.title("Piedra, Papel o Tijeras")
+    ventana_juego.title("Ventana Principal")
+    ventana_juego.geometry("300x200")  # Tamaño inicial
+    ventana_juego.protocol("WM_DELETE_WINDOW", lambda: None)  # Evitar que se cierre
+    ventana_juego.withdraw()  # Empezamos con la ventana invisible
+    ventana_juego.mainloop()
+
+# Actualizar la ventana existente para el juego
+def iniciar_juego(client_socket):
+    # Hacer visible la ventana y limpiar el contenido
+    ventana_juego.deiconify()
+    for widget in ventana_juego.winfo_children():
+        widget.destroy()
 
     # Función para enviar la jugada
     def enviar_jugada(jugada):
@@ -50,54 +68,59 @@ def crear_ventana(client_socket):
     btn_papel.pack(padx=10, pady=5)
     btn_tijeras.pack(padx=10, pady=5)
 
-    # Mostrar ventana
-    ventana_juego.protocol("WM_DELETE_WINDOW", ventana_juego.destroy)  # Manejar el cierre de la ventana
-    ventana_juego.mainloop()
-
-def iniciar_juego(client_socket):
-    crear_ventana(client_socket)
+    # Actualizar la ventana
+    ventana_juego.update()
 
 def sensor_comandos(message, client_socket):
     if "/[game]" in message:
         parts = message.split(" ", 2)
         if len(parts) < 3:
-            print("mal\n".encode('utf-8'))
+            print("".encode('utf-8'))
         else:
-            
             jugador = parts[1]
             turno = parts[2]
             
-            print("jugador: " + jugador)
-            print("Tu turno es: " + turno)
+            # print("jugador: " + jugador)
+            # print("Tu turno es: " + turno)
 
-            # Iniciar el juego en un nuevo hilo
-            threading.Thread(target=iniciar_juego, args=(client_socket,)).start()
+            # Iniciar el juego en el mismo hilo de la ventana base
+            iniciar_juego(client_socket)
+            return False
 
-    # Mostrar resultado del juego si el mensaje contiene "/juego win", "/juego lose", o "/juego empate"
     elif message == "/juego win":
         mostrar_resultado("¡Has ganado!", "green")
+        return False
 
     elif message == "/juego lose":
         mostrar_resultado("¡Has perdido!", "red")
+        return False
 
     elif message == "/juego empate":
         mostrar_resultado("¡Empate!", "orange")
+        return False
+    else:
+        return True
 
 def mostrar_resultado(mensaje, color):
-    # if ventana_juego is not None:
-    #     for widget in ventana_juego.winfo_children():
-    #         widget.destroy()
+    if ventana_juego is not None:
+        for widget in ventana_juego.winfo_children():
+            widget.destroy()
 
         # Crear un nuevo label para mostrar el resultado
         resultado_label = tk.Label(ventana_juego, text=mensaje, fg=color, font=("Helvetica", 24))
         resultado_label.pack(padx=20, pady=20)
 
-        # Opción para cerrar el juego o reiniciar (puedes ajustar esto según tus necesidades)
-        btn_cerrar = tk.Button(ventana_juego, text="Cerrar", command=ventana_juego.destroy)
+        # Botón para limpiar y ocultar la ventana sin cerrar el programa
+        btn_cerrar = tk.Button(ventana_juego, text="Cerrar", command=ocultar_ventana)
         btn_cerrar.pack(pady=10)
 
-        # Actualizar la ventana
         ventana_juego.update()
+
+# Función que limpia y oculta la ventana
+def ocultar_ventana():
+    for widget in ventana_juego.winfo_children():
+        widget.destroy()  # Limpiar todos los widgets
+    ventana_juego.withdraw()  # Ocultar la ventana
         
 
 def chat(client_socket):
@@ -112,9 +135,10 @@ def chat(client_socket):
                 message = client_socket.recv(1024).decode('utf-8')
                 if not message:
                     break
-                print(message)
+                
 
-                sensor_comandos(message, client_socket)
+                if sensor_comandos(message, client_socket):
+                    print(message)
 
                 contador_msg += 1
             except:
@@ -182,8 +206,9 @@ def start_client():
     if "actualizada" not in server_message:  
         receive_update(client_socket)
     else:
-        chat(client_socket)  
+        chat(client_socket) 
 
 if __name__ == "__main__":
     borra_backup()
+    threading.Thread(target=crear_ventana_inicial, daemon=True).start()
     start_client()

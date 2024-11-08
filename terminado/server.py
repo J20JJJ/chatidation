@@ -8,7 +8,7 @@ from io import BytesIO
 import re
 import random
 
-server_version = "0.3"
+server_version = "0.6"
 clients = []
 nicknames = []
 games = []  # Diccionario para almacenar juegos en curso
@@ -46,7 +46,7 @@ def image_to_ascii(image_url, width=100):
         return f"Error al procesar la imagen"
 
 
-def comprovar_ppt(game, ipJugador, jugador):
+def comprovar_ppt(comando, game, ipJugador, jugador):
 
 
     def borrar_partida():
@@ -87,30 +87,76 @@ def comprovar_ppt(game, ipJugador, jugador):
         ipJugador.send(f"/juego empate".encode('utf-8'))
         print("EMPATE")
     
-
-
-    if game["mano_j1"] == game["mano_j2"]:
-        empate()
-        # print("EMPATE")
-    elif game["mano_j1"] == "papel" and game["mano_j2"] == "piedra":
-        gana_J1()
-        # print("Jugador 1 gana")
-    elif game["mano_j1"] == "piedra" and game["mano_j2"] == "papel":
-        gana_J2()
-        # print("Jugador 2 gana")
-    elif game["mano_j1"] == "tijeras" and game["mano_j2"] == "papel":
-        gana_J1()
-        # print("Jugador 1 gana")
-    elif game["mano_j1"] == "papel" and game["mano_j2"] == "tijeras":
-        gana_J2()
-        # print("Jugador 2 gana")
-    elif game["mano_j1"] == "piedra" and game["mano_j2"] == "tijeras":
-        gana_J1()
-        # print("Jugador 1 gana")
-    elif game["mano_j1"] == "tijeras" and game["mano_j2"] == "piedra":
-        gana_J2()
-        # print("Jugador 2 gana")
+    # PIEDRA PAPEL TIJERA
+    if comando == "ppt":
+        if game["mano_j1"] == game["mano_j2"]:
+            empate()
+            # print("EMPATE")
+        elif game["mano_j1"] == "papel" and game["mano_j2"] == "piedra":
+            gana_J1()
+            # print("Jugador 1 gana")
+        elif game["mano_j1"] == "piedra" and game["mano_j2"] == "papel":
+            gana_J2()
+            # print("Jugador 2 gana")
+        elif game["mano_j1"] == "tijeras" and game["mano_j2"] == "papel":
+            gana_J1()
+            # print("Jugador 1 gana")
+        elif game["mano_j1"] == "papel" and game["mano_j2"] == "tijeras":
+            gana_J2()
+            # print("Jugador 2 gana")
+        elif game["mano_j1"] == "piedra" and game["mano_j2"] == "tijeras":
+            gana_J1()
+            # print("Jugador 1 gana")
+        elif game["mano_j1"] == "tijeras" and game["mano_j2"] == "piedra":
+            gana_J2()
+            # print("Jugador 2 gana")
     
+    # PIEDRA PAPEL TIJERA
+
+    if comando == "tictactoe":
+        tablero = game["tablero"]
+        
+        # Revisa filas
+        for fila in tablero:
+            if fila[0] == fila[1] == fila[2] and fila[0] != "":
+                if fila[0] == "X":
+                    gana_J1()
+                    return
+                elif fila[0] == "O":
+                    gana_J2()
+                    return
+
+        # Revisa columnas
+        for col in range(3):
+            if tablero[0][col] == tablero[1][col] == tablero[2][col] and tablero[0][col] != "":
+                if tablero[0][col] == "X":
+                    gana_J1()
+                    return
+                elif tablero[0][col] == "O":
+                    gana_J2()
+                    return
+
+        # Revisa diagonales
+        if tablero[0][0] == tablero[1][1] == tablero[2][2] and tablero[0][0] != "":
+            if tablero[0][0] == "X":
+                gana_J1()
+                return
+            elif tablero[0][0] == "O":
+                gana_J2()
+                return
+
+        if tablero[0][2] == tablero[1][1] == tablero[2][0] and tablero[0][2] != "":
+            if tablero[0][2] == "X":
+                gana_J1()
+                return
+            elif tablero[0][2] == "O":
+                gana_J2()
+                return
+
+        # Revisa si hay empate (no hay espacios vacíos)
+        if all(cell != "" for row in tablero for cell in row):
+            empate()
+
 
         
 
@@ -220,7 +266,7 @@ def chat_handler(client_socket):
                             if nickname == game["jugador1"]:
                                 game["mano_j1"] = movimiento
                                 print("el jugador1 es: " + nickname)
-                                comprovar_ppt(game, client_socket, "1")
+                                comprovar_ppt(comando, game, client_socket, "1")
                                 break  
                                 
                             elif nickname == game["jugador2"]:
